@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Comparador de Pólizas</title>
+  <style>
+    body {
+      background-color: #0e1117;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: #d0d6f9;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    h1 {
+      color: #4cc9f0;
+      margin-bottom: 20px;
+      text-shadow: 0 0 15px #4cc9f0;
+    }
+
+    .form-box {
+      background: #1b1f2b;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 0 20px rgba(76, 201, 240, 0.2);
+      width: 350px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    input[type="file"] {
+      padding: 10px;
+      background-color: #2c3140;
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+    }
+
+    button {
+      padding: 10px;
+      background-color: #4cc9f0;
+      border: none;
+      color: #0e1117;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background-color 0.2s ease-in-out;
+    }
+
+    button:hover {
+      background-color: #3abedc;
+    }
+
+    .response-box {
+      margin-top: 20px;
+      background-color: #1b1f2b;
+      padding: 20px;
+      border-radius: 12px;
+      max-width: 600px;
+      overflow-wrap: break-word;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Sube tus pólizas</h1>
+  <form class="form-box" id="uploadForm">
+    <input type="file" name="files" id="fileInput" multiple accept="application/pdf" required />
+    <button type="submit">Analizar</button>
+  </form>
+
+  <div class="response-box" id="responseBox" style="display:none;"></div>
+
+  <script>
+    const form = document.getElementById('uploadForm');
+    const responseBox = document.getElementById('responseBox');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const files = document.getElementById('fileInput').files;
+      const formData = new FormData();
+
+      for (let i = 0; i < files.length; i++) {
+        formData.append('files', files[i]);
+      }
+
+      const res = await fetch('http://localhost:5678/webhook-test/54f2bfec-ef76-4a22-90df-13e89dd80293', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await res.json();
+      responseBox.style.display = 'block';
+      responseBox.innerText = JSON.stringify(data, null, 2);
+    });
+  </script>
+</body>
+</html>
