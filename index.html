@@ -2,102 +2,62 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Comparador de Pólizas</title>
-  <style>
-    body {
-      background-color: #0e1117;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      color: #d0d6f9;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
-    }
-
-    h1 {
-      color: #4cc9f0;
-      margin-bottom: 20px;
-      text-shadow: 0 0 15px #4cc9f0;
-    }
-
-    .form-box {
-      background: #1b1f2b;
-      padding: 30px;
-      border-radius: 12px;
-      box-shadow: 0 0 20px rgba(76, 201, 240, 0.2);
-      width: 350px;
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-    }
-
-    input[type="file"] {
-      padding: 10px;
-      background-color: #2c3140;
-      color: #ffffff;
-      border: none;
-      border-radius: 8px;
-    }
-
-    button {
-      padding: 10px;
-      background-color: #4cc9f0;
-      border: none;
-      color: #0e1117;
-      border-radius: 8px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: background-color 0.2s ease-in-out;
-    }
-
-    button:hover {
-      background-color: #3abedc;
-    }
-
-    .response-box {
-      margin-top: 20px;
-      background-color: #1b1f2b;
-      padding: 20px;
-      border-radius: 12px;
-      max-width: 600px;
-      overflow-wrap: break-word;
-      font-size: 14px;
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Comparador Inteligente</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <h1>Sube tus pólizas</h1>
-  <form class="form-box" id="uploadForm">
-    <input type="file" name="files" id="fileInput" multiple accept="application/pdf" required />
-    <button type="submit">Analizar</button>
-  </form>
+  <header class="main-header">
+    <div class="container">
+      <h1>Comparador Inteligente</h1>
+      <p>Transforma cotizaciones de seguros en análisis profesionales.</p>
+    </div>
+  </header>
 
-  <div class="response-box" id="responseBox" style="display:none;"></div>
+  <section class="features">
+    <div class="container">
+      <ul>
+        <li>✔ Automatiza el análisis de pólizas</li>
+        <li>✔ Genera informes en Word y Excel</li>
+        <li>✔ Simple, rápido y preciso</li>
+      </ul>
+    </div>
+  </section>
 
-  <script>
-    const form = document.getElementById('uploadForm');
-    const responseBox = document.getElementById('responseBox');
+  <section class="pricing">
+    <div class="container">
+      <h2>Planes de Suscripción</h2>
+      <div class="plan-grid">
+        <div class="plan">
+          <h3>🪙 Básico</h3>
+          <p>$0 / mes</p>
+          <p>Hasta 2 archivos</p>
+        </div>
+        <div class="plan">
+          <h3>🥈 Pro</h3>
+          <p>$9.99 / mes</p>
+          <p>Hasta 30 archivos</p>
+        </div>
+        <div class="plan">
+          <h3>🥇 Empresarial</h3>
+          <p>$29.99 / mes</p>
+          <p>Sin límite</p>
+        </div>
+      </div>
+    </div>
+  </section>
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const files = document.getElementById('fileInput').files;
-      const formData = new FormData();
+  <section class="cta">
+    <div class="container">
+      <a href="/pdfAnalyzer.html" class="btn">Registrarse</a>
+      <a href="/pdfAnalyzer.html" class="btn">Iniciar sesión</a>
+    </div>
+  </section>
 
-      for (let i = 0; i < files.length; i++) {
-        formData.append('files', files[i]);
-      }
-
-      const res = await fetch('http://localhost:5678/webhook-test/54f2bfec-ef76-4a22-90df-13e89dd80293', {
-        method: 'POST',
-        body: formData
-      });
-
-      const data = await res.json();
-      responseBox.style.display = 'block';
-      responseBox.innerText = JSON.stringify(data, null, 2);
-    });
-  </script>
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; 2025 Comparador Inteligente. Todos los derechos reservados.</p>
+    </div>
+  </footer>
 </body>
 </html>

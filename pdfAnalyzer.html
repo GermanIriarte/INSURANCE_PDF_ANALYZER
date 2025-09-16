@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Comparador Inteligente</title>
+  <link rel="stylesheet" href="Analyzer.css">
+</head>
+<body>
+  <!-- Header con logo, saludo y cierre de sesión -->
+  <header class="header">
+    <div class="container header-container">
+      <div class="logo">Comparador Inteligente</div>
+      <div class="user-info">
+        <span>Hola, tú</span>
+        <a href="index.html" class="btn-logout">Cerrar sesión</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Dashboard principal con tres secciones centradas -->
+  <main class="container dashboard">
+    <!-- Paso 1: Subir PDFs -->
+    <section class="card section-upload">
+      <h2>Paso 1: Subir PDFs</h2>
+      <form id="uploadForm">
+        <label for="pdfInput" class="file-label">
+          ⊕ Arrastra tus archivos o haz clic aquí
+          <input type="file" id="pdfInput" name="files" accept="application/pdf" multiple required aria-describedby="filesSummary"/>
+        </label>
+        <div class="files-summary" id="filesSummary" hidden>0 archivos seleccionados</div>
+        <ul id="fileList" class="file-list" aria-live="polite"></ul>
+        <button type="submit" class="btn-action" disabled>Subir archivos</button>
+      </form>
+      <div id="uploadResponse" class="response-area"></div>
+    </section>
+
+    <!-- Paso 2: Descargar hoja (Excel/Sheets) -->
+    <section class="card section-excel">
+      <h2>Paso 2: Descargar hoja (Excel/Sheets)</h2>
+      <button id="downloadSheetBtn" class="btn-action" disabled>Descargar hoja</button>
+      <div id="excelResponse" class="response-area"></div>
+    </section>
+
+    <!-- Paso 3: Descargar informe PDF -->
+    <section class="card section-word">
+      <h2>Paso 3: Descargar informe PDF</h2>
+      <button id="downloadPdfBtn" class="btn-action" disabled>Descargar PDF</button>
+      <div id="wordResponse" class="response-area"></div>
+    </section>
+  </main>
+
+  <!-- Footer fijo al fondo -->
+  <footer class="footer">
+    <div class="container">
+      <p>© 2025 Comparador Inteligente. Todos los derechos reservados.</p>
+    </div>
+  </footer>
+
+  <!-- Scripts para manejar eventos -->
+  <script>
+    const uploadForm = document.getElementById('uploadForm');
+    const excelBtn   = document.getElementById('downloadSheetBtn');
+    const wordBtn    = document.getElementById('downloadPdfBtn');
+
+    // Webhook POST (análisis)
+  const webhookUrl = 'https://n8n.149-130-187-171.sslip.io/webhook/3034612b-c6ad-4372-871e-8a65ffc8b626';
+ 
+
+    // Deriva la base de n8n (usa /webhook-test si el POST también es test)
+    const N8N_BASE = (() => {
+      try {
+        const u = new URL(webhookUrl);
+        const isTest = u.pathname.startsWith('/webhook-test/');
+        return `${u.origin}${isTest ? '/webhook-test' : '/webhook'}`;
+      } catch {
+        return (location.hostname === 'localhost')
+          ? 'http://localhost:5678/webhook-test'
+          : `${location.origin}/webhook`;
+      }
+    })();
+
+    // URL de descarga XLSX: si el POST te dio sheetUrl, úsalo; si no, endpoint fijo
+    function getXlsxUrl() {
+      return (window.sheetUrl && String(window.sheetUrl)) || `${N8N_BASE}/download/xlsx?t=${Date.now()}`;
+    }
+
+    const excelResp = document.getElementById('excelResponse');
+    const wordResp  = document.getElementById('wordResponse');
+
+    let sheetUrl = null;
+    let pdfUrl   = null;
+
+    if (excelBtn) excelBtn.disabled = true;
+    if (wordBtn)  wordBtn.disabled  = true;
+
+    async function postFiles() {
+      const files = selectedFiles.length ? selectedFiles : Array.from(fileInput.files);
+      const formData = new FormData();
+      for (const f of files) formData.append('files', f);
+      const res = await fetch(webhookUrl, { method: 'POST', body: formData });
+      return res.json();
+    }
+
+    uploadForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      // Evita doble-click mientras envías
+      if (uploadForm.dataset.loading === '1') return;
+      uploadForm.dataset.loading = '1';
+
+      // Estado inicial (limpia y bloquea)
+      window.pdfUrl = null;
+      if (wordBtn)  wordBtn.disabled  = true;
+      if (excelBtn) excelBtn.disabled = true;
+      if (wordResp) wordResp.textContent  = 'Generando PDF...';
+      if (excelResp) excelResp.textContent = '';
+
+      try {
+        // Timeout opcional (10 min) para el POST
+        const ac = new AbortController();
+        const to = setTimeout(() => ac.abort(new Error('timeout')), 600000);
+
+        // Prepara FormData
+        const files = selectedFiles.length ? selectedFiles : Array.from(fileInput.files);
+        if (!files.length) throw new Error('Selecciona al menos un PDF.');
+        const fd = new FormData();
+        files.forEach(f => fd.append('files', f));
+
+        const res = await fetch(webhookUrl, { method: 'POST', body: fd, signal: ac.signal });
+        clearTimeout(to);
+        if (!res.ok) throw new Error(`POST falló (${res.status})`);
+
+        // Parse robusto
+        const ct = res.headers.get('content-type') || '';
+        const data = ct.includes('application/json') ? await res.json() : JSON.parse(await res.text());
+
+      // Actualiza y NORMALIZA URLs al origen de n8n
+    window.sheetUrl = data.sheetUrl || data.excelUrl || null;
+    window.pdfUrl   = data.pdfUrl   || data.wordUrl  || data.pdfPath || null;
+
+    const base = new URL(N8N_BASE).origin; // ej: https://n8n.149-130-187-171.sslip.io
+
+    if (window.sheetUrl) {
+      if (window.sheetUrl.startsWith('/')) window.sheetUrl = base + window.sheetUrl;
+      window.sheetUrl = window.sheetUrl.replace(/^http:\/\/localhost:5678/, base);
+    }
+
+    if (window.pdfUrl) {
+      if (window.pdfUrl.startsWith('/')) window.pdfUrl = base + window.pdfUrl;
+      window.pdfUrl = window.pdfUrl.replace(/^http:\/\/localhost:5678/, base);
+    }
+
+
+        // Habilita siempre el botón de Excel (el endpoint GET funciona aunque no llegue sheetUrl)
+        excelBtn.disabled = false;
+        excelResp.innerHTML = `<a href="${getXlsxUrl()}" target="_blank" rel="noopener">Descargar hoja</a>`;
+
+        if (window.pdfUrl) {
+          wordBtn.disabled = false;
+          wordResp.innerHTML = `<a href="${window.pdfUrl}" target="_blank" rel="noopener" download>Descargar PDF</a>`;
+        } else {
+          wordBtn.disabled = true;
+          wordResp.textContent = 'No se recibió URL de PDF.';
+        }
+
+        document.getElementById('uploadResponse').innerText = JSON.stringify(data, null, 2);
+      } catch (err) {
+        console.error(err);
+        const msg = err?.message === 'timeout'
+          ? 'La generación tardó demasiado. Inténtalo de nuevo.'
+          : `Error generando el PDF: ${err?.message || 'desconocido'}`;
+        if (wordResp) wordResp.textContent = msg;
+        document.getElementById('uploadResponse').innerText = (err && (err.stack || err.message)) || String(err);
+      } finally {
+        uploadForm.dataset.loading = '0';
+        submitBtn.disabled = !selectedFiles.length;
+      }
+    });
+
+    const fileInput    = document.getElementById('pdfInput');
+    const fileLabel    = document.querySelector('.section-upload .file-label');
+    const fileListEl   = document.getElementById('fileList');
+    const filesSummary = document.getElementById('filesSummary');
+    const submitBtn    = document.querySelector('#uploadForm .btn-action');
+
+    let selectedFiles = []; // fuente de verdad
+
+    function updatePreview() {
+      selectedFiles = selectedFiles.filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+
+      const totalMB = selectedFiles.reduce((a,f)=>a+f.size,0) / (1024*1024);
+      const hasFiles = selectedFiles.length > 0;
+
+      filesSummary.hidden = !hasFiles;
+      if (hasFiles) {
+        filesSummary.textContent = `${selectedFiles.length} archivo${selectedFiles.length===1?'':'s'} · ${totalMB.toFixed(1)} MB`;
+      }
+
+      fileListEl.innerHTML = selectedFiles.map((f, i) =>
+        `<li class="file-item">
+           <span>${f.name}</span>
+           <button type="button" aria-label="Quitar ${f.name}" data-remove="${i}">×</button>
+         </li>`
+      ).join('');
+
+      submitBtn.disabled = !hasFiles;
+      if (excelBtn) excelBtn.disabled = true; // se habilita tras el POST exitoso
+    }
+
+    fileInput.addEventListener('change', (e) => {
+      selectedFiles = Array.from(e.target.files);
+      updatePreview();
+    });
+
+    ['dragenter','dragover'].forEach(ev =>
+      fileLabel.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); fileLabel.classList.add('dragover'); })
+    );
+    ['dragleave','drop'].forEach(ev =>
+      fileLabel.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); fileLabel.classList.remove('dragover'); })
+    );
+    fileLabel.addEventListener('drop', (e) => {
+      selectedFiles = Array.from(e.dataTransfer.files);
+      updatePreview();
+    });
+
+    fileListEl.addEventListener('click', (e) => {
+      if (e.target.matches('button[data-remove]')) {
+        const idx = Number(e.target.getAttribute('data-remove'));
+        selectedFiles.splice(idx, 1);
+        updatePreview();
+      }
+    });
+
+    const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+
+    downloadPdfBtn.onclick = async () => {
+      if (!window.pdfUrl) { alert('Aún estamos generando el PDF…'); return; }
+
+      try {
+        downloadPdfBtn.disabled = true;
+
+        const res = await fetch(window.pdfUrl, { cache: 'no-store' });
+        if (!res.ok) throw new Error('No se pudo obtener el PDF');
+
+        const blob = await res.blob();
+        const url  = URL.createObjectURL(blob);
+
+        const cd = res.headers.get('content-disposition');
+        let name = cd && /filename\*?=(?:UTF-8''|")?([^\";]+)/i.exec(cd)?.[1];
+        if (!name) name = new URL(window.pdfUrl).searchParams.get('name') || 'Analisis.pdf';
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = decodeURIComponent(name);
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        alert(err.message || 'Error descargando el PDF');
+      } finally {
+        downloadPdfBtn.disabled = false;
+      }
+    };
+
+    // Descarga Excel por navegación directa (evita CORS)
+    excelBtn.onclick = () => {
+      const url = getXlsxUrl();
+      if (!url) { alert('Aún no hay hoja lista. Sube los PDFs primero.'); return; }
+      window.location.href = url; // el servidor envía Content-Disposition con el nombre
+    };
+  </script>
+</body>
+</html>
