@@ -64,8 +64,7 @@
     const wordBtn    = document.getElementById('downloadPdfBtn');
 
     // Webhook POST (análisis)
-  const webhookUrl = 'https://n8n.149-130-187-171.sslip.io/webhook/3034612b-c6ad-4372-871e-8a65ffc8b626';
- 
+    const webhookUrl = 'https://n8n.149-130-187-171.sslip.io/webhook/3034612b-c6ad-4372-871e-8a65ffc8b626';
 
     // Deriva la base de n8n (usa /webhook-test si el POST también es test)
     const N8N_BASE = (() => {
@@ -80,6 +79,55 @@
       }
     })();
 
+    // === Autenticación Basic (en memoria) ===
+    let AUTH_HEADER = null;
+
+    async function pedirCredenciales() {
+      const user = prompt('Usuario:');
+      const pass = prompt('Contraseña:');
+      if (!user || !pass) throw new Error('Se requiere autenticación');
+      AUTH_HEADER = 'Basic ' + btoa(`${user}:${pass}`);
+    }
+
+    // Wrapper fetch con Authorization + reintento ante 401
+    async function fetchAuth(url, opts = {}, reintento = false) {
+      const headers = new Headers(opts.headers || {});
+      if (AUTH_HEADER) headers.set('Authorization', AUTH_HEADER);
+      const res = await fetch(url, { ...opts, headers, cache: 'no-store' });
+      if (res.status === 401 && !reintento) {
+        try { await pedirCredenciales(); } catch {}
+        return fetchAuth(url, opts, true);
+      }
+      return res;
+    }
+
+    // Utilidades de descarga
+    function descargarBlob(blob, nombre) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = nombre || 'archivo';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function nombreDesdeDisposition(res, fallback = 'archivo') {
+      const cd = res.headers.get('Content-Disposition') || res.headers.get('content-disposition') || '';
+      const m = /filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i.exec(cd);
+      try {
+        if (m && m[1]) return decodeURIComponent(m[1]);
+        if (m && m[2]) return m[2];
+      } catch {}
+      return fallback;
+    }
+
+    // Pedir credenciales al cargar
+    (async () => {
+      try { await pedirCredenciales(); } catch {}
+    })();
+
     // URL de descarga XLSX: si el POST te dio sheetUrl, úsalo; si no, endpoint fijo
     function getXlsxUrl() {
       return (window.sheetUrl && String(window.sheetUrl)) || `${N8N_BASE}/download/xlsx?t=${Date.now()}`;
@@ -88,95 +136,8 @@
     const excelResp = document.getElementById('excelResponse');
     const wordResp  = document.getElementById('wordResponse');
 
-    let sheetUrl = null;
-    let pdfUrl   = null;
-
     if (excelBtn) excelBtn.disabled = true;
     if (wordBtn)  wordBtn.disabled  = true;
-
-    async function postFiles() {
-      const files = selectedFiles.length ? selectedFiles : Array.from(fileInput.files);
-      const formData = new FormData();
-      for (const f of files) formData.append('files', f);
-      const res = await fetch(webhookUrl, { method: 'POST', body: formData });
-      return res.json();
-    }
-
-    uploadForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      // Evita doble-click mientras envías
-      if (uploadForm.dataset.loading === '1') return;
-      uploadForm.dataset.loading = '1';
-
-      // Estado inicial (limpia y bloquea)
-      window.pdfUrl = null;
-      if (wordBtn)  wordBtn.disabled  = true;
-      if (excelBtn) excelBtn.disabled = true;
-      if (wordResp) wordResp.textContent  = 'Generando PDF...';
-      if (excelResp) excelResp.textContent = '';
-
-      try {
-        // Timeout opcional (10 min) para el POST
-        const ac = new AbortController();
-        const to = setTimeout(() => ac.abort(new Error('timeout')), 600000);
-
-        // Prepara FormData
-        const files = selectedFiles.length ? selectedFiles : Array.from(fileInput.files);
-        if (!files.length) throw new Error('Selecciona al menos un PDF.');
-        const fd = new FormData();
-        files.forEach(f => fd.append('files', f));
-
-        const res = await fetch(webhookUrl, { method: 'POST', body: fd, signal: ac.signal });
-        clearTimeout(to);
-        if (!res.ok) throw new Error(`POST falló (${res.status})`);
-
-        // Parse robusto
-        const ct = res.headers.get('content-type') || '';
-        const data = ct.includes('application/json') ? await res.json() : JSON.parse(await res.text());
-
-      // Actualiza y NORMALIZA URLs al origen de n8n
-    window.sheetUrl = data.sheetUrl || data.excelUrl || null;
-    window.pdfUrl   = data.pdfUrl   || data.wordUrl  || data.pdfPath || null;
-
-    const base = new URL(N8N_BASE).origin; // ej: https://n8n.149-130-187-171.sslip.io
-
-    if (window.sheetUrl) {
-      if (window.sheetUrl.startsWith('/')) window.sheetUrl = base + window.sheetUrl;
-      window.sheetUrl = window.sheetUrl.replace(/^http:\/\/localhost:5678/, base);
-    }
-
-    if (window.pdfUrl) {
-      if (window.pdfUrl.startsWith('/')) window.pdfUrl = base + window.pdfUrl;
-      window.pdfUrl = window.pdfUrl.replace(/^http:\/\/localhost:5678/, base);
-    }
-
-
-        // Habilita siempre el botón de Excel (el endpoint GET funciona aunque no llegue sheetUrl)
-        excelBtn.disabled = false;
-        excelResp.innerHTML = `<a href="${getXlsxUrl()}" target="_blank" rel="noopener">Descargar hoja</a>`;
-
-        if (window.pdfUrl) {
-          wordBtn.disabled = false;
-          wordResp.innerHTML = `<a href="${window.pdfUrl}" target="_blank" rel="noopener" download>Descargar PDF</a>`;
-        } else {
-          wordBtn.disabled = true;
-          wordResp.textContent = 'No se recibió URL de PDF.';
-        }
-
-        document.getElementById('uploadResponse').innerText = JSON.stringify(data, null, 2);
-      } catch (err) {
-        console.error(err);
-        const msg = err?.message === 'timeout'
-          ? 'La generación tardó demasiado. Inténtalo de nuevo.'
-          : `Error generando el PDF: ${err?.message || 'desconocido'}`;
-        if (wordResp) wordResp.textContent = msg;
-        document.getElementById('uploadResponse').innerText = (err && (err.stack || err.message)) || String(err);
-      } finally {
-        uploadForm.dataset.loading = '0';
-        submitBtn.disabled = !selectedFiles.length;
-      }
-    });
 
     const fileInput    = document.getElementById('pdfInput');
     const fileLabel    = document.querySelector('.section-upload .file-label');
@@ -232,43 +193,113 @@
       }
     });
 
-    const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+    uploadForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
 
-    downloadPdfBtn.onclick = async () => {
-      if (!window.pdfUrl) { alert('Aún estamos generando el PDF…'); return; }
+      // Evita doble-click mientras envías
+      if (uploadForm.dataset.loading === '1') return;
+      uploadForm.dataset.loading = '1';
+
+      // Estado inicial (limpia y bloquea)
+      window.sheetUrl = null;
+      window.pdfUrl   = null;
+      if (wordBtn)  wordBtn.disabled  = true;
+      if (excelBtn) excelBtn.disabled = true;
+      if (wordResp)  wordResp.textContent  = 'Generando PDF...';
+      if (excelResp) excelResp.textContent = '';
 
       try {
-        downloadPdfBtn.disabled = true;
+        // Timeout opcional (10 min) para el POST
+        const ac = new AbortController();
+        const to = setTimeout(() => ac.abort(new Error('timeout')), 600000);
 
-        const res = await fetch(window.pdfUrl, { cache: 'no-store' });
+        // Prepara FormData
+        const files = selectedFiles.length ? selectedFiles : Array.from(fileInput.files);
+        if (!files.length) throw new Error('Selecciona al menos un PDF.');
+        const fd = new FormData();
+        files.forEach(f => fd.append('files', f));
+
+        const res = await fetchAuth(webhookUrl, { method: 'POST', body: fd, signal: ac.signal });
+        clearTimeout(to);
+        if (!res.ok) throw new Error(`POST falló (${res.status})`);
+
+        // Parse robusto
+        const ct = res.headers.get('content-type') || '';
+        const data = ct.includes('application/json') ? await res.json() : JSON.parse(await res.text());
+
+        // Actualiza y NORMALIZA URLs al origen de n8n
+        window.sheetUrl = data.sheetUrl || data.excelUrl || null;
+        window.pdfUrl   = data.pdfUrl   || data.wordUrl  || data.pdfPath || null;
+
+        const base = new URL(N8N_BASE).origin; // ej: https://n8n.149-130-187-171.sslip.io
+        if (window.sheetUrl) {
+          if (window.sheetUrl.startsWith('/')) window.sheetUrl = base + window.sheetUrl;
+          window.sheetUrl = window.sheetUrl.replace(/^http:\/\/localhost:5678/, base);
+        }
+        if (window.pdfUrl) {
+          if (window.pdfUrl.startsWith('/')) window.pdfUrl = base + window.pdfUrl;
+          window.pdfUrl = window.pdfUrl.replace(/^http:\/\/localhost:5678/, base);
+        }
+
+        // Habilita botones y mensajes
+        excelBtn.disabled = false;
+        excelResp.textContent = 'Hoja lista para descargar.';
+
+        if (window.pdfUrl) {
+          wordBtn.disabled = false;
+          wordResp.textContent = 'PDF listo para descargar.';
+        } else {
+          wordBtn.disabled = true;
+          wordResp.textContent = 'No se recibió URL de PDF.';
+        }
+
+        document.getElementById('uploadResponse').innerText = JSON.stringify(data, null, 2);
+      } catch (err) {
+        console.error(err);
+        const msg = err?.message === 'timeout'
+          ? 'La generación tardó demasiado. Inténtalo de nuevo.'
+          : `Error generando el PDF: ${err?.message || 'desconocido'}`;
+        if (wordResp) wordResp.textContent = msg;
+        document.getElementById('uploadResponse').innerText = (err && (err.stack || err.message)) || String(err);
+      } finally {
+        uploadForm.dataset.loading = '0';
+        submitBtn.disabled = !selectedFiles.length;
+      }
+    });
+
+    // Descargar PDF con Auth
+    wordBtn.onclick = async () => {
+      if (!window.pdfUrl) { alert('Aún estamos generando el PDF…'); return; }
+      try {
+        wordBtn.disabled = true;
+        const res = await fetchAuth(window.pdfUrl, { cache: 'no-store' });
         if (!res.ok) throw new Error('No se pudo obtener el PDF');
-
         const blob = await res.blob();
-        const url  = URL.createObjectURL(blob);
-
-        const cd = res.headers.get('content-disposition');
-        let name = cd && /filename\*?=(?:UTF-8''|")?([^\";]+)/i.exec(cd)?.[1];
-        if (!name) name = new URL(window.pdfUrl).searchParams.get('name') || 'Analisis.pdf';
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = decodeURIComponent(name);
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
+        const nombre = nombreDesdeDisposition(res, (new URL(window.pdfUrl)).searchParams.get('name') || 'Analisis.pdf');
+        descargarBlob(blob, nombre);
       } catch (err) {
         alert(err.message || 'Error descargando el PDF');
       } finally {
-        downloadPdfBtn.disabled = false;
+        wordBtn.disabled = false;
       }
     };
 
-    // Descarga Excel por navegación directa (evita CORS)
-    excelBtn.onclick = () => {
+    // Descargar XLSX con Auth (ya no se usa navegación directa)
+    excelBtn.onclick = async () => {
       const url = getXlsxUrl();
       if (!url) { alert('Aún no hay hoja lista. Sube los PDFs primero.'); return; }
-      window.location.href = url; // el servidor envía Content-Disposition con el nombre
+      try {
+        excelBtn.disabled = true;
+        const res = await fetchAuth(url, { cache: 'no-store' });
+        if (!res.ok) throw new Error('No se pudo obtener la hoja');
+        const blob = await res.blob();
+        const nombre = nombreDesdeDisposition(res, 'Comparador.xlsx');
+        descargarBlob(blob, nombre);
+      } catch (e) {
+        alert(e.message || 'Error descargando la hoja');
+      } finally {
+        excelBtn.disabled = false;
+      }
     };
   </script>
 </body>
