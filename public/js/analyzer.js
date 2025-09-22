@@ -16,6 +16,14 @@ function toast(msg, type = "info") {
   setTimeout(() => toastEl.classList.remove("show"), 3200);
 }
 
+function busy(btn, on, txtIdle="Descargar", txtBusy="Procesando…") {
+  if (!btn) return;
+  btn.dataset.busy = on ? "1" : "0";
+  if (on) { btn.dataset._old = btn.textContent; btn.textContent = txtBusy; }
+  else if (btn.dataset._old) { btn.textContent = btn.dataset._old; delete btn.dataset._old; }
+}
+
+
 
 const uploadForm = document.getElementById('uploadForm');
 const excelBtn   = document.getElementById('downloadSheetBtn');
@@ -131,6 +139,8 @@ if (excelBtn) excelBtn.disabled = true; // se habilita tras el POST exitoso, des
 
 fileInput.addEventListener('change', (e) => {
 selectedFiles = Array.from(e.target.files);
+try { validarSeleccion(selectedFiles); }
+catch (err) { toast(err.message, 'error'); selectedFiles = []; if (fileInput) fileInput.value = ''; }
 updatePreview();
 });
 
@@ -148,6 +158,8 @@ fileLabel.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation();
 
 fileLabel.addEventListener('drop', (e) => {
 selectedFiles = Array.from(e.dataTransfer.files);
+try { validarSeleccion(selectedFiles); }
+catch (err) { toast(err.message, 'error'); selectedFiles = []; }
 updatePreview();
 });
 
@@ -158,6 +170,16 @@ selectedFiles.splice(idx, 1);
 updatePreview();
 }
 });
+
+const MAX_FILES = 3;           // o el que quieras
+const MAX_MB_PER_FILE = 25;     // 25 MB por archivo
+
+function validarSeleccion(files) {
+  if (!files.length) throw new Error('Selecciona al menos un PDF.');
+  if (files.length > MAX_FILES) throw new Error(`Máximo ${MAX_FILES} archivos.`);
+  const muyGrandes = files.filter(f => (f.size/(1024*1024)) > MAX_MB_PER_FILE);
+  if (muyGrandes.length) throw new Error(`Hay ${muyGrandes.length} archivo(s) > ${MAX_MB_PER_FILE} MB.`);
+}
 
 uploadForm.addEventListener('submit', async (e) => {
 e.preventDefault();
@@ -181,7 +203,7 @@ const to = setTimeout(() => ac.abort(new Error('timeout')), 700000);
 
 // Prepara FormData
 const files = selectedFiles.length ? selectedFiles : Array.from(fileInput.files);
-if (!files.length) throw new Error('Selecciona al menos un PDF.');
+validarSeleccion(files);    
 const fd = new FormData(); //formdata sirve para empaquetar datos y enviar por pteicion http. 
 files.forEach(f => fd.append('files', f)); //añadimos cada archvio al form data
 
@@ -282,6 +304,18 @@ excelBtn.disabled = false;
 loading(false);
 }
 };
+
+const btnClear = document.getElementById('btnClear');
+btnClear?.addEventListener('click', () => {
+  selectedFiles = [];
+  if (fileInput) fileInput.value = "";
+  updatePreview();
+  excelBtn.disabled = true; wordBtn.disabled = true;
+  if (excelResp) excelResp.textContent = "";
+  if (wordResp)  wordResp.textContent  = "";
+  document.getElementById('uploadResponse').innerText = "";
+  toast("Listo. Puedes cargar nuevos archivos.");
+});
 
 
 

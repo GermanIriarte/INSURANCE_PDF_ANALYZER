@@ -22,7 +22,7 @@
   <main class="container dashboard">
     <!-- Paso 1: Subir PDFs -->
     <section class="card section-upload">
-      <h2>Paso 1: Subir PDFs</h2>
+      <h2>Paso 1: Subir PDFs <small>Arrastra varios a la vez (solo .pdf)</small></h2>
       <form id="uploadForm">
         <label for="pdfInput" class="file-label">
           ⊕ Arrastra tus archivos o haz clic aquí
@@ -31,20 +31,21 @@
         <div class="files-summary" id="filesSummary" hidden>0 archivos seleccionados</div>
         <ul id="fileList" class="file-list" aria-live="polite"></ul>
         <button type="submit" class="btn-action" disabled>Subir archivos</button>
+        <button type="button" class="btn-action btn-ghost" id="btnClear">Limpiar</button>
       </form>
       <div id="uploadResponse" class="response-area"></div>
     </section>
 
     <!-- Paso 2: Descargar hoja (Excel/Sheets) -->
     <section class="card section-excel">
-      <h2>Paso 2: Descargar hoja (Excel/Sheets)</h2>
+      <h2>Paso 2: Descargar hoja (Excel/Sheets) <small>Exporta el consolidado</small></h2>
       <button id="downloadSheetBtn" class="btn-action" disabled>Descargar hoja</button>
       <div id="excelResponse" class="response-area"></div>
     </section>
 
     <!-- Paso 3: Descargar informe PDF -->
     <section class="card section-word">
-      <h2>Paso 3: Descargar informe PDF</h2>
+      <h2>Paso 3: Descargar informe PDF <small>Formato listo para compartir</small></h2>
       <button id="downloadPdfBtn" class="btn-action" disabled>Descargar PDF</button>
       <div id="wordResponse" class="response-area"></div>
     </section>
