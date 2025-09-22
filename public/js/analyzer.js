@@ -8,6 +8,7 @@ function loading(on) {
   backdrop.classList.toggle("show", !!on);
 }
 
+// Bloquea/desbloquea el Paso 1 para evitar dobles submits
 function toast(msg, type = "info") {
   if (!toastEl) return;
   toastEl.textContent = msg;
@@ -23,6 +24,13 @@ function busy(btn, on, txtIdle="Descargar", txtBusy="Procesando…") {
   else if (btn.dataset._old) { btn.textContent = btn.dataset._old; delete btn.dataset._old; }
 }
 
+function lockForm(on) {
+  if (!uploadForm) return;
+  if (fileInput) fileInput.disabled = !!on;
+  if (submitBtn) submitBtn.disabled = !!on;
+  const lbl = document.querySelector('.section-upload .file-label');
+  if (lbl) lbl.setAttribute('aria-disabled', on ? 'true' : 'false');
+}
 
 
 const uploadForm = document.getElementById('uploadForm');
@@ -187,6 +195,9 @@ e.preventDefault();
 // Evita doble-click mientras envías
 if (uploadForm.dataset.loading === '1') return;
 uploadForm.dataset.loading = '1';
+lockForm(true);
+loading(true);
+busy(submitBtn, true, "Analizar archivos", "Subiendo…");
 
 // Estado inicial (limpia y bloquea)
 window.sheetUrl = null;
@@ -258,52 +269,64 @@ toast(msg, 'error');
 } finally {
 uploadForm.dataset.loading = '0';
 submitBtn.disabled = !selectedFiles.length;
+lockForm(false);
 loading(false);
+busy(submitBtn, false);
 }
 });
 
 // Descargar PDF con Auth
 wordBtn.onclick = async () => {
-if (!window.pdfUrl) { alert('Aún estamos generando el PDF…'); return; }
-try {
-loading(true);
-wordBtn.disabled = true;
-const res = await fetchAuth(window.pdfUrl, { cache: 'no-store' });
-if (!res.ok) throw new Error('No se pudo obtener el PDF');
-const blob = await res.blob();
-const nombre = nombreDesdeDisposition(res, (new URL(window.pdfUrl)).searchParams.get('name') || 'Analisis.pdf');
-descargarBlob(blob, nombre);
-toast('PDF descargado');
-} catch (err) {
-alert(err.message || 'Error descargando el PDF');
-toast(err.message || 'Error descargando el PDF', 'error');
-} finally {
-wordBtn.disabled = false;
-loading(false);
-}
+  if (!window.pdfUrl) { alert('Aún estamos generando el PDF…'); return; }
+  try {
+    loading(true);
+    busy(wordBtn, true, "Descargar PDF", "Descargando…");
+    wordBtn.disabled = true;
+
+    const sep = window.pdfUrl.includes('?') ? '&' : '?';
+    const res = await fetchAuth(`${window.pdfUrl}${sep}t=${Date.now()}`, { cache: 'no-store' });
+
+    if (!res.ok) throw new Error('No se pudo obtener el PDF');
+    const blob = await res.blob();
+    const nombre = nombreDesdeDisposition(res, (new URL(window.pdfUrl)).searchParams.get('name') || 'Analisis.pdf');
+    descargarBlob(blob, nombre);
+    toast('PDF descargado');
+  } catch (err) {
+    alert(err.message || 'Error descargando el PDF');
+    toast(err.message || 'Error descargando el PDF', 'error');
+  } finally {
+    wordBtn.disabled = false;
+    busy(wordBtn, false);
+    loading(false);
+  }
 };
+
 
 // Descargar XLSX con Auth (ya no se usa navegación directa)
 excelBtn.onclick = async () => {
-const url = getXlsxUrl();
-if (!url) { alert('Aún no hay hoja lista. Sube los PDFs primero.'); return; }
-try {
-loading(true);
-excelBtn.disabled = true;
-const res = await fetchAuth(url, { cache: 'no-store' });
-if (!res.ok) throw new Error('No se pudo obtener la hoja');
-const blob = await res.blob();
-const nombre = nombreDesdeDisposition(res, 'Comparador.xlsx');
-descargarBlob(blob, nombre);
-toast('XLSX descargado');
-} catch (e) {
-alert(e.message || 'Error descargando la hoja');
-toast(e.message || 'Error descargando la hoja', 'error');
-} finally {
-excelBtn.disabled = false;
-loading(false);
-}
+  const url = getXlsxUrl();
+  if (!url) { alert('Aún no hay hoja lista. Sube los PDFs primero.'); return; }
+  try {
+    loading(true);
+    busy(excelBtn, true, "Descargar hoja", "Descargando…");
+    excelBtn.disabled = true;
+
+    const res = await fetchAuth(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error('No se pudo obtener la hoja');
+    const blob = await res.blob();
+    const nombre = nombreDesdeDisposition(res, 'Comparador.xlsx');
+    descargarBlob(blob, nombre);
+    toast('XLSX descargado');
+  } catch (e) {
+    alert(e.message || 'Error descargando la hoja');
+    toast(e.message || 'Error descargando la hoja', 'error');
+  } finally {
+    excelBtn.disabled = false;
+    busy(excelBtn, false);
+    loading(false);
+  }
 };
+
 
 const btnClear = document.getElementById('btnClear');
 btnClear?.addEventListener('click', () => {
@@ -317,5 +340,13 @@ btnClear?.addEventListener('click', () => {
   toast("Listo. Puedes cargar nuevos archivos.");
 });
 
+
+// Evita Enter/click durante carga
+uploadForm?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && uploadForm.dataset.loading === '1') e.preventDefault();
+});
+fileInput?.addEventListener('click', (e) => {
+  if (uploadForm.dataset.loading === '1') e.preventDefault();
+});
 
 

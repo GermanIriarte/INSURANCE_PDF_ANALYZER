@@ -233,3 +233,6 @@ input[type="file"] {
 
 .btn-ghost{ background:#eef2ff; color:#4f46e5; }
 .btn-ghost:hover{ filter: brightness(.98); }
+
+/* Mientras sube, desactiva el dropzone y muestra estado */
+.file-label[aria-disabled="true"] { opacity: .6; pointer-events: none; }
