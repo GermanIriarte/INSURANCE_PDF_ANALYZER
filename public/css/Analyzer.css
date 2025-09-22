@@ -184,3 +184,20 @@ input[type="file"] {
   cursor: not-allowed;
   filter: grayscale(.1);
 }
+
+
+/* Accesibilidad y estados */
+.file-label:focus-within { outline: 2px solid #2dd4bf; outline-offset: 4px; }
+.btn-action[disabled] { opacity: .6; cursor: not-allowed; }
+.dragover { border-color: #2dd4bf !important; background: rgba(45,212,191,.06); }
+
+/* Backdrop */
+.backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: none; place-items: center; z-index: 50; }
+.backdrop.show { display: grid; }
+.spinner { width: 36px; height: 36px; border-radius: 50%; border: 4px solid #2a2f39; border-top-color: #2dd4bf; animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Toast */
+.toast { position: fixed; right: 16px; bottom: 16px; background: #0f131a; color: #e7e7e7;
+  border: 1px solid #263042; border-radius: 10px; padding: 10px 12px; display: none; z-index: 60; }
+.toast.show { display: block; }
