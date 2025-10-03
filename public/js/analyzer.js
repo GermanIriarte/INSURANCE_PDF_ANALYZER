@@ -38,7 +38,7 @@ const excelBtn   = document.getElementById('downloadSheetBtn');
 const wordBtn    = document.getElementById('downloadPdfBtn');
 
 // Webhook POST (análisis)
-const webhookUrl = 'http://localhost:5678/webhook-test/3034612b-c6ad-4372-871e-8a65ffc8b626';
+const webhookUrl = 'https://n8n.149-130-187-171.sslip.io/webhook/3034612b-c6ad-4372-871e-8a65ffc8b626';
 
 // Deriva la base de n8n (usa /webhook-test si el POST también es test)
 //construir una url base para la deacarga, creando una url absoluta y añadiendo webhook test o webhook dependiendo del origen
