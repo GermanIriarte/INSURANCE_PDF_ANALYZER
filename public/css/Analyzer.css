@@ -59,12 +59,19 @@ body {
 /* Dashboard: grid responsivo centrado */
 .dashboard {
   display: grid;
-  /* Crea columnas de ancho mínimo 300px y ancho automático según contenido */
-  grid-template-columns: repeat(auto-fit, minmax(300px, auto));
   gap: 2rem;
   margin: 2rem 0;
-  justify-content: center;    /* centra el grid cuando hay columnas extra */
+  justify-content: center;
+  grid-template-columns: repeat(3, minmax(300px, 1fr));
+  grid-template-areas:
+    "upload excel word"
+    "merge  .     .";
 }
+
+.section-upload { grid-area: upload; }
+.section-excel  { grid-area: excel; }
+.section-word   { grid-area: word; }
+.section-merge  { grid-area: merge; }
 
 /* Tarjetas */
 .card {
@@ -94,8 +101,17 @@ body {
 .file-label:hover {
   background: #eef2ff;
 }
-input[type="file"] {
-  display: none;
+
+.file-label {
+  position: relative;
+}
+
+.file-label input[type="file"]{
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 
 /* Botones */
@@ -236,3 +252,17 @@ input[type="file"] {
 
 /* Mientras sube, desactiva el dropzone y muestra estado */
 .file-label[aria-disabled="true"] { opacity: .6; pointer-events: none; }
+
+
+@media (max-width: 980px) {
+  .dashboard {
+    grid-template-columns: minmax(300px, 1fr);
+    grid-template-areas:
+      "upload"
+      "merge"
+      "excel"
+      "word";
+  }
+}
+
+

@@ -22,18 +22,29 @@
   <main class="container dashboard">
     <!-- Paso 1: Subir PDFs -->
     <section class="card section-upload">
+
       <h2>Paso 1: Subir PDFs <small>Arrastra varios a la vez (solo .pdf)</small></h2>
-      <form id="uploadForm">
-        <label for="pdfInput" class="file-label">
+
+      <form id="uploadForm" novalidate>  <!--bloque logico de entrada de datos-->
+
+        <label for="pdfInput" class="file-label"> <!--etiqueta con texto que tiene un input dentro.-->
           ⊕ Arrastra tus archivos o haz clic aquí
-          <input type="file" id="pdfInput" name="files" accept="application/pdf" multiple required aria-describedby="filesSummary"/>
+          <input type="file" id="pdfInput" name="files" accept="application/pdf" multiple aria-describedby="filesSummary"/>
         </label>
+
         <div class="files-summary" id="filesSummary" hidden>0 archivos seleccionados</div>
+
         <ul id="fileList" class="file-list" aria-live="polite"></ul>
+
         <button type="submit" class="btn-action" disabled>Subir archivos</button>
         <button type="button" class="btn-action btn-ghost" id="btnClear">Limpiar</button>
+
       </form>
+
+      
+
       <div id="uploadResponse" class="response-area"></div>
+
     </section>
 
     <!-- Paso 2: Descargar hoja (Excel/Sheets) -->
@@ -49,7 +60,43 @@
       <button id="downloadPdfBtn" class="btn-action" disabled>Descargar PDF</button>
       <div id="wordResponse" class="response-area"></div>
     </section>
+
+
+    <section class="card section-merge">
+
+  <h2>Unir PDFs <small>Selecciona varios para fusionar en uno</small></h2>
+
+  
+  <!-- Paso 2: Unir PDFs -->
+
+  <form id="mergePdfs" novalidate>
+
+    <label for="mergeInput" class="merge-label">
+      ⊕ Selecciona los archivos a unir
+      <input 
+        type="file" 
+        id="mergeInput" 
+        name="mergeFiles" 
+        accept="application/pdf" 
+        multiple 
+        aria-describedby="mergeSummary"/>
+    </label>
+
+    <div class="files-summary" id="mergeSummary" hidden>0 archivos seleccionados</div>
+
+    <ul id="mergeFileList" class="file-list" aria-live="polite"></ul>
+
+    <button type="submit" class="btn-action" disabled>Unir PDFs</button>
+    <button type="button" class="btn-action btn-ghost" id="btnMergeClear">Limpiar</button>
+
+  </form>
+
+  <div id="mergeResponse" class="response-area"></div>
+
+</section>
   </main>
+
+
 
   <!-- Footer fijo al fondo -->
   <footer class="footer">
@@ -62,7 +109,10 @@
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <!-- Scripts para manejar eventos -->
-  <script src="./public/js/analyzer.js" type="module"></script>
- 
+<script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+<script src="./public/js/analyzer.js"></script>
+<script src="./public/js/merge.js"></script>
+
+
 </body>
 </html>

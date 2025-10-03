@@ -38,7 +38,7 @@ const excelBtn   = document.getElementById('downloadSheetBtn');
 const wordBtn    = document.getElementById('downloadPdfBtn');
 
 // Webhook POST (análisis)
-const webhookUrl = 'https://n8n.149-130-187-171.sslip.io/webhook/3034612b-c6ad-4372-871e-8a65ffc8b626';
+const webhookUrl = 'http://localhost:5678/webhook-test/3034612b-c6ad-4372-871e-8a65ffc8b626';
 
 // Deriva la base de n8n (usa /webhook-test si el POST también es test)
 //construir una url base para la deacarga, creando una url absoluta y añadiendo webhook test o webhook dependiendo del origen
@@ -142,14 +142,21 @@ fileListEl.innerHTML = selectedFiles.map((f, i) =>
 ).join(''); // agregamos una lista con cada archivo y una opcion de remove. 
 
 submitBtn.disabled = !hasFiles;
-if (excelBtn) excelBtn.disabled = true; // se habilita tras el POST exitoso, despues de que hasfiles >0
+if (excelBtn) excelBtn.disabled = true; // se habilita tras el POST exitoso, despues de que hasfiles > 0
 }
 
 fileInput.addEventListener('change', (e) => {
-selectedFiles = Array.from(e.target.files);
-try { validarSeleccion(selectedFiles); }
-catch (err) { toast(err.message, 'error'); selectedFiles = []; if (fileInput) fileInput.value = ''; }
-updatePreview();
+  const picked = Array.from(e.target.files || []);
+  if (!picked.length) return;
+  try {
+    tryAddFiles(picked);
+  } catch (err) {
+    console.error(err);
+    toast(err.message || 'Selección inválida', 'error');
+  } finally {
+    // Limpia el value para que el mismo archivo pueda disparar 'change' de nuevo si lo re-seleccionan
+    fileInput.value = '';
+  }
 });
 
 
@@ -160,9 +167,21 @@ updatePreview();
 fileLabel.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); fileLabel.classList.add('dragover'); })
 ); //permitimos eventos para arrastrar archvios en el fileLabel (input), evitamos el comportamiento por defecto que es que se abren , 
 
-['dragleave','drop'].forEach(ev =>
-fileLabel.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); fileLabel.classList.remove('dragover'); })
-);
+fileLabel.addEventListener('drop', (e) => {
+  e.preventDefault(); e.stopPropagation();
+  fileLabel.classList.remove('dragover');
+
+  const dropped = Array.from(e.dataTransfer?.files || []);
+  if (!dropped.length) return;
+
+  try {
+    tryAddFiles(dropped);
+  } catch (err) {
+    console.error(err);
+    toast(err.message || 'Selección inválida', 'error');
+  }
+});
+
 
 fileLabel.addEventListener('drop', (e) => {
 selectedFiles = Array.from(e.dataTransfer.files);
@@ -350,3 +369,44 @@ fileInput?.addEventListener('click', (e) => {
 });
 
 
+//helpers
+function fileKey(f) {
+  return [f.name, f.size, f.lastModified].join("::");
+}
+
+function tryAddFiles(incoming) {
+  const before = selectedFiles.slice();
+  const map = new Map(before.map(f => [fileKey(f), f]));
+  for (const f of incoming) map.set(fileKey(f), f);         // dedupe por nombre+tamaño+mtime
+  const merged = Array.from(map.values());
+
+  validarSeleccion(merged);                                 // valida el conjunto resultante
+  selectedFiles = merged;
+  updatePreview();
+  submitBtn && (submitBtn.disabled = selectedFiles.length === 0);
+  excelBtn && (excelBtn.disabled = true);
+}
+
+function fileKey(f){ return [f.name, f.size, f.lastModified].join('::'); }
+
+window.addFilesToUpload = function(files){
+  const inc = Array.from(files||[]);
+  const map = new Map(selectedFiles.map(f => [fileKey(f), f]));
+  inc.forEach(f => map.set(fileKey(f), f));             // de-dup
+  const merged = Array.from(map.values());
+  try {
+    validarSeleccion(merged);
+    selectedFiles = merged;
+    updatePreview();
+    submitBtn && (submitBtn.disabled = selectedFiles.length === 0 ? true : false);
+    excelBtn && (excelBtn.disabled = true);
+  } catch (e) {
+    toast(e.message || 'Selección inválida', 'error');
+  }
+};
+
+
+
+window.toast = toast;
+window.loading = loading;
+window.busy = busy;
